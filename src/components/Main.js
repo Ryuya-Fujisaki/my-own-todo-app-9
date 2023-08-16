@@ -1,58 +1,111 @@
 import React, { useState } from 'react';
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
-import dummyData from "../dummyData";
+import { v4 as uuidv4 } from 'uuid';
 import Card from './Card';
+import { TextField, Button } from '@mui/material';
 
 const Main = () => {
-    const [ data, setData ] = useState(dummyData);
+    const [ data, setData ] = useState([
+      {
+        id: uuidv4(),
+        title: "📝今からやること",
+        tasks: [],
+      }, 
+      {
+        id: uuidv4(),
+        title: "🚀今後やること",
+        tasks: [],
+      }, 
+      {
+        id: uuidv4(),
+        title: "🌳終わったこと",
+        tasks: [],
+      },
+    ]);
 
     const onDragEnd = (result) => {
       if (!result.destination) return;
-      const {source, destination} = result;
 
-      //別のカラムにタスクが移動したとき
-      if (source.droppableId !== destination.droppableId) {
-        const sourceColIndex = data.findIndex((e) => e.id === source.droppableId);
-        const destinationColIndex = data.findIndex(
-          (e) => e.id === destination.droppableId
-          );
+      const source = result.source;
+      const destination = result.destination;
 
-        const sourceCol = data[sourceColIndex];
-        const destinationCol = data[destinationColIndex];
+      //同じカラム内でのタスクの移動
+      if (source.droppableId === destination.droppableId) {
+        const sectionIndex = data.findIndex((e) => e.id === source.droppableId);
+        const section = data[sectionIndex];
+        const updatedTasks = [...section.tasks];
+        const [removed] = updatedTasks.splice(source.index, 1);
+        updatedTasks.splice(destination.index, 0, removed);
 
-        //動かし始めたタスクが属していたカラムの中のタスクを全て取得
-        //後でsplice関数でその動かし始めたタスクを削除するため
-        //sourceTaskに配列をコピーしておく(破壊操作を後でするため)
-        const sourceTask = [...sourceCol.tasks];
-
-        //動かし終わったタスクが属していたカラムの中のタスクを全て取得
-        //後でsplice関数でその動かし始めたタスクを追加するため        
-        const destinationTask = [...destinationCol.tasks];
-
-        //動かし始めたタスクを前のカラムから削除
-        const [removed] = sourceTask.splice(source.index, 1);
-        //動かした後のカラムにタスクを追加
-        destinationTask.splice(destination.index, 0, removed);
-
-        data[sourceColIndex].tasks = sourceTask;
-        data[destinationColIndex].tasks = destinationTask;
-
-        setData(data);
+        const newData = [...data];
+        newData[sectionIndex] = {...section, tasks: updatedTasks};
+        setData(newData);
       } else {
-        //同じカラム内でのタスクの入れ替え
-        const sourceColIndex = data.findIndex((e) => e.id === source.droppableId);
-        const sourceCol = data[sourceColIndex];
-        console.log(sourceCol);
+        //異なるカラムへのタスクの移動
+        const sourceSectionIndex = data.findIndex(
+          (e) => e.id === source.droppableId
+        );
+        const destinationSectionIndex = data.findIndex(
+          (e) => e.id === destination.droppableId
+        );
 
-        const sourceTask = [...sourceCol.tasks];
-        //タスクを削除
-        const [removed] = sourceTask.splice(source.index, 1);
-        //タスクを追加
-        sourceTask.splice(destination.index, 0, removed);
+        const sourceSection = data[sourceSectionIndex];
+        const destinationSection = data[destinationSectionIndex];
 
-        data[sourceColIndex].tasks = sourceTask;
-        setData(data);
+        const updatedSourceTasks = [...sourceSection.tasks];
+        const updatedDestinationTasks = [...destinationSection.tasks];
+
+        const [removed] = updatedSourceTasks.splice(source.index, 1);
+        updatedDestinationTasks.splice(destination.index, 0, removed);
+
+        const newData = [...data];
+        newData[sourceSectionIndex] = {
+          ...sourceSection,
+          tasks: updatedSourceTasks,
+        };
+        newData[destinationSectionIndex] = {
+          ...destinationSection,
+          tasks: updatedDestinationTasks,
+        };
+        setData(newData);
+      }
+    };
+
+    const handleTextChange = ( newTitle, sectionId, taskId) => {
+      const newData = data.map((section) => {
+        if (section.id === sectionId) {
+          const updatedTasks = section.tasks.map((task) => {
+            if (task.id === taskId) {
+              return { ...task, title: newTitle };
+            }
+              return task;
+          });
+            return { ...section, tasks: updatedTasks };
         }
+          return section;
+      });
+
+        setData(newData);
+    };
+
+    const handleAddCard = (sectionId) => {
+      const newData = data.map((section) => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            tasks: [
+              ...section.tasks,
+              {
+                id: uuidv4(),
+                title: '',
+              },
+            ],
+          };
+        }
+        return section;
+      });
+
+      setData(newData);
     };
 
   return (
@@ -84,11 +137,15 @@ const Main = () => {
                                   opacity: snapshot.isDragging ? "0.5" : "1",
                                 }}
                               >
-                                <Card>{task.title}</Card>
+                                <Card
+                                  task={task}
+                                  onTextChange={(newTitle) => handleTextChange(newTitle, section.id, task.id)}
+                                />
                               </div>
                             )}
                           </Draggable>
                         ))}
+                        <Button onClick={() => handleAddCard(section.id)}>カードの追加</Button>
                         {provided.placeholder}
                       </div>
                     </div>
